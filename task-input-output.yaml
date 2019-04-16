@@ -1,0 +1,79 @@
+---
+apiVersion: tekton.dev/v1alpha1
+kind: PipelineResource
+metadata:
+  name: hello-go-git
+spec:
+  type: git
+  params:
+    - name: revision
+      value: master
+    - name: url
+      value: https://github.com/kuops/hello-go.git
+---
+apiVersion: tekton.dev/v1alpha1
+kind: PipelineResource
+metadata:
+  name: hello-go-image
+spec:
+  type: image
+  params:
+    - name: url
+      value: kuopsme/hello-go
+---
+apiVersion: tekton.dev/v1alpha1
+kind: Task
+metadata:
+  name: build-docker-image-from-git-source
+spec:
+  inputs:
+    resources:
+      - name: docker-source
+        type: git
+    params:
+      - name: pathToDockerFile
+        description: The path to the dockerfile to build
+        default: /workspace/docker-source/Dockerfile
+      - name: pathToContext
+        description:
+          The build context used by Kaniko
+          (https://github.com/GoogleContainerTools/kaniko#kaniko-build-contexts)
+        default: /workspace/docker-source
+  outputs:
+    resources:
+      - name: builtImage
+        type: image
+  steps:
+    - name: build-and-push
+      image: kuopsme/kaniko-project.executor:latest
+      command:
+        - /kaniko/executor
+      args:
+        - --dockerfile=${inputs.params.pathToDockerFile}
+        - --destination=${outputs.resources.builtImage.url}
+        - --context=${inputs.params.pathToContext}
+---
+apiVersion: tekton.dev/v1alpha1
+kind: TaskRun
+metadata:
+  name: build-docker-image-from-git-source-task-run
+spec:
+  taskRef:
+    name: build-docker-image-from-git-source
+  trigger:
+    type: manual
+  inputs:
+    resources:
+      - name: docker-source
+        resourceRef:
+          name: hello-go-git
+    params:
+      - name: pathToDockerFile
+        value: Dockerfile
+      - name: pathToContext
+        value: /workspace/docker-source/
+  outputs:
+    resources:
+      - name: builtImage
+        resourceRef:
+          name: hello-go-image

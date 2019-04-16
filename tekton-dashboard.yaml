@@ -1,0 +1,55 @@
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: tekton-dashboard
+  namespace: tekton-pipelines
+  labels: 
+    app: tekton-dashboard-deployment  
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: tekton-dashboard
+  template:
+    metadata:
+      name: tekton-dashboard
+      labels:
+        app: tekton-dashboard
+    spec:
+      serviceAccountName: tekton-pipelines-controller
+      containers:
+      - name: tekton-dashboard
+        image: kuopsme/tekton.dashboard:v0.2
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 9097
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 9097
+        readinessProbe:
+          httpGet:
+            path: /readiness
+            port: 9097
+        resources:
+        env:
+        - name: PORT
+          value: "9097"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  labels:
+    app: tekton-dashboard-deployment
+  name: tekton-dashboard
+  namespace: tekton-pipelines
+spec:
+  ports:
+  - nodePort: 31078
+    port: 9097
+    protocol: TCP
+    targetPort: 9097
+  selector:
+    app: tekton-dashboard
+  type: NodePort
